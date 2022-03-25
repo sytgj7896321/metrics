@@ -67,38 +67,64 @@ var (
 		QuotaCode:   &code[3][1],
 	}
 
-	s3Inout  = s3.ListBucketsInput{}
-	s3Result = make(map[string]int)
-	s3Vec    = prometheus.NewGaugeVec(
+	s3Inout      = s3.ListBucketsInput{}
+	s3Result     = make(map[string]int)
+	s3CurrentVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "total_buckets_usage_per_region",
-			Help: "Total buckets usage per region",
+			Name: "total_buckets_usage_per_region_current",
+			Help: "Total buckets usage per region current",
+		},
+		[]string{"region"},
+	)
+	s3LimitedVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "total_buckets_usage_per_region_limited",
+			Help: "Total buckets usage per region limited",
 		},
 		[]string{"region"},
 	)
 
-	acmInput = acm.ListCertificatesInput{}
-	acmVec   = prometheus.NewGaugeVec(
+	acmInput      = acm.ListCertificatesInput{}
+	acmCurrentVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "total_certificates_usage_per_region",
-			Help: "Total certificates usage per region",
+			Name: "total_certificates_usage_per_region_current",
+			Help: "Total certificates usage per region current",
+		},
+		[]string{"region"},
+	)
+	acmLimitedVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "total_certificates_usage_per_region_limited",
+			Help: "Total certificates usage per region limited",
 		},
 		[]string{"region"},
 	)
 
-	cloudFrontInput = cloudfront.ListDistributionsInput{}
-	cloudFrontVec   = prometheus.NewGauge(
+	cfInput                   = cloudfront.ListDistributionsInput{}
+	cfDistributionsCurrentVec = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "total_cloudfront_distributions_usage",
-			Help: "Total cloudfront distributions usage",
+			Name: "total_cloudfront_distributions_usage_current",
+			Help: "Total cloudfront distributions usage current",
+		},
+	)
+	cfDistributionsLimitedVec = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "total_cloudfront_distributions_usage_limited",
+			Help: "Total cloudfront distributions usage limited",
 		},
 	)
 
-	cloudFrontOAIInput = cloudfront.ListCloudFrontOriginAccessIdentitiesInput{}
-	cloudFrontOAIVec   = prometheus.NewGauge(
+	cfOAIInput      = cloudfront.ListCloudFrontOriginAccessIdentitiesInput{}
+	cfOAICurrentVec = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "total_cloudfront_origin_access_identify_usage",
-			Help: "Total cloudfront origin access identify usage",
+			Name: "total_cloudfront_origin_access_identifies_usage_current",
+			Help: "Total cloudfront origin access identifies usage current",
+		},
+	)
+	cfOAILimitedVec = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "total_cloudfront_origin_access_identifies_usage_limited",
+			Help: "Total cloudfront origin access identifies usage limited",
 		},
 	)
 )
