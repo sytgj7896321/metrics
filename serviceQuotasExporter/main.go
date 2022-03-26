@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -53,10 +54,12 @@ var (
 	}
 	usEast1  = findUsEast1Index(regionList)
 	interval int
+	port     int
 )
 
 func init() {
 	flag.IntVar(&interval, "interval", 5, "time interval(minutes) of call aws api to collect data")
+	flag.IntVar(&port, "port", 2112, "listen port")
 }
 
 func main() {
@@ -108,7 +111,7 @@ func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Println("Service Quotas Exporter Started")
-	log.Fatalln(http.ListenAndServe(":2112", nil))
+	log.Fatalln(http.ListenAndServe(":"+strconv.Itoa(port), nil))
 }
 
 func trigger(clients *allClients) {
