@@ -9,13 +9,21 @@ import (
 )
 
 var (
-	//failCount = prometheus.NewCounterVec(
-	//	prometheus.CounterOpts{
-	//		Name: "total_aws_api_call_failed_count",
-	//		Help: "Total aws api call failed count",
-	//	},
-	//	[]string{"type"},
-	//)
+	failCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "total_aws_api_call_failed_count",
+			Help: "Total aws api call failed count",
+		},
+		[]string{"api"},
+	)
+
+	totalCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "total_aws_api_call_count",
+			Help: "Total aws api call count",
+		},
+		[]string{"api"},
+	)
 
 	code = [][]string{
 		{"s3", "L-DC2B2D3D"},
