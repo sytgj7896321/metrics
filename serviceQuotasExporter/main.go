@@ -201,10 +201,10 @@ func checkBuckets(clients *allClients) {
 			s3LimitedVec.WithLabelValues(v).Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
 		} else {
 			quotaDefault, err := clients.serviceQuotasClients[i].GetAWSDefaultServiceQuota(context.TODO(), &serviceQuotasS3FilterDefault)
-			if errorHandle(err, "listQuotasDefault") {
+			if errorHandle(err, "getQuotasDefault") {
 				continue
 			} else {
-				totalCount.WithLabelValues("listQuotasDefault").Inc()
+				totalCount.WithLabelValues("getQuotasDefault").Inc()
 			}
 			s3CurrentVec.WithLabelValues(v).Set(float64(s3Result[v]))
 			s3LimitedVec.WithLabelValues(v).Set(*quotaDefault.Quota.Value)
@@ -239,10 +239,10 @@ func checkCertificates(clients *allClients) {
 			acmLimitedVec.WithLabelValues(regionList[i]).Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
 		} else {
 			quotaDefault, err := clients.serviceQuotasClients[i].GetAWSDefaultServiceQuota(context.TODO(), &serviceQuotasACMFilterDefault)
-			if errorHandle(err, "listQuotasDefault") {
+			if errorHandle(err, "getQuotasDefault") {
 				continue
 			} else {
-				totalCount.WithLabelValues("listQuotasDefault").Inc()
+				totalCount.WithLabelValues("getQuotasDefault").Inc()
 			}
 			acmCurrentVec.WithLabelValues(regionList[i]).Set(float64(len(certificates.CertificateSummaryList)))
 			acmLimitedVec.WithLabelValues(regionList[i]).Set(*quotaDefault.Quota.Value)
@@ -269,10 +269,10 @@ func checkCloudFrontDistributions(clients *allClients) {
 		cfDistributionsLimitedVec.Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
 	} else {
 		quotaDefault, err := clients.serviceQuotasClients[usEast1].GetAWSDefaultServiceQuota(context.TODO(), &serviceQuotasCloudFrontDistributionsFilterDefault)
-		if errorHandle(err, "listQuotasDefault") {
+		if errorHandle(err, "getQuotasDefault") {
 			return
 		} else {
-			totalCount.WithLabelValues("listQuotasDefault").Inc()
+			totalCount.WithLabelValues("getQuotasDefault").Inc()
 		}
 		cfDistributionsCurrentVec.Set(float64(len(distributions.DistributionList.Items)))
 		cfDistributionsLimitedVec.Set(*quotaDefault.Quota.Value)
@@ -297,10 +297,10 @@ func checkCloudFrontOAI(clients *allClients) {
 		cfOAILimitedVec.Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
 	} else {
 		quotaDefault, err := clients.serviceQuotasClients[usEast1].GetAWSDefaultServiceQuota(context.TODO(), &serviceQuotasCloudFrontOAIFilterDefault)
-		if errorHandle(err, "listQuotasDefault") {
+		if errorHandle(err, "getQuotasDefault") {
 			return
 		} else {
-			totalCount.WithLabelValues("listQuotasDefault").Inc()
+			totalCount.WithLabelValues("getQuotasDefault").Inc()
 		}
 		cfOAICurrentVec.Set(float64(len(identities.CloudFrontOriginAccessIdentityList.Items)))
 		cfOAILimitedVec.Set(*quotaDefault.Quota.Value)
