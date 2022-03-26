@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
@@ -50,11 +51,16 @@ var (
 		"us-west-1",
 		"us-west-2",
 	}
-
-	usEast1 = findUsEast1Index(regionList)
+	usEast1  = findUsEast1Index(regionList)
+	interval int
 )
 
+func init() {
+	flag.IntVar(&interval, "interval", 5, "time interval(minutes) of call aws api to collect data")
+}
+
 func main() {
+	flag.Parse()
 	prometheus.MustRegister(
 		s3CurrentVec,
 		s3LimitedVec,
@@ -117,7 +123,7 @@ func trigger(clients *allClients) {
 				case "cloudfront":
 					checkCloudFront(clients)
 				}
-				time.Sleep(5 * time.Minute)
+				time.Sleep(time.Duration(interval) * time.Minute)
 			}
 		}(v)
 	}
