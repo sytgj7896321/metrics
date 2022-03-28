@@ -107,7 +107,7 @@ func main() {
 }
 
 func (all *allClients) lifeCycleEngine() {
-	defaultConfig, err := config.LoadDefaultConfig(context.TODO())
+	defaultConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
 	if err != nil {
 		log.Fatalf("failed to load SDK configuration, %v\n", err)
 	}
