@@ -18,8 +18,6 @@ RUN cd serviceQuotasExporter && go build .
 
 FROM scratch
 
-USER scratchuser
-
 COPY --from=builder /build/serviceQuotasExporter /
 
 ENTRYPOINT ["/serviceQuotasExporter"]
