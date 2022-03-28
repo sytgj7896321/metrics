@@ -87,14 +87,21 @@ func main() {
 		cfOAILimitedVec,
 	)
 
+	defaultConfig, perRegionConfig, err := createClientConfig()
+
+	if err != nil {
+		log.Fatalf("failed to load SDK configuration, %v\n", err)
+	}
+
 	all := new(allClients)
-	all.lifeCycleEngine()
+
+	all.lifeCycleTokenUpdate(defaultConfig, perRegionConfig)
 
 	go func() {
 		for {
 			select {
 			case <-time.After(59 * time.Minute):
-				all.lifeCycleEngine()
+				all.lifeCycleTokenUpdate(defaultConfig, perRegionConfig)
 			}
 		}
 	}()
@@ -106,40 +113,37 @@ func main() {
 	log.Fatalln(http.ListenAndServe(":"+strconv.Itoa(port), nil))
 }
 
-func (all *allClients) lifeCycleEngine() {
-	defaultConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
-	if err != nil {
-		log.Fatalf("failed to load SDK configuration, %v\n", err)
+func createClientConfig() (defaultConfig aws.Config, perRegionConfig []aws.Config, err error) {
+	defaultConfig, err = config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
+	for _, v := range regionList {
+		var cfg aws.Config
+		cfg, err = config.LoadDefaultConfig(context.TODO(), config.WithRegion(v))
+		perRegionConfig = append(perRegionConfig, cfg)
 	}
+	return defaultConfig, perRegionConfig, err
+}
 
+func (all *allClients) lifeCycleTokenUpdate(defaultConfig aws.Config, perRegionConfig []aws.Config) {
 	stsSvc := sts.NewFromConfig(defaultConfig)
 	credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
 	defaultConfig.Credentials = aws.NewCredentialsCache(credentials)
 
 	all.serviceQuotasClients = make([]*servicequotas.Client, 0)
-	for _, v := range regionList {
-		cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(v))
-		if err != nil {
-			log.Fatalf("failed to load SDK configuration, %v\n", err)
-		}
-		stsSvc := sts.NewFromConfig(cfg)
+	for _, v := range perRegionConfig {
+		stsSvc := sts.NewFromConfig(v)
 		credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
-		cfg.Credentials = aws.NewCredentialsCache(credentials)
-		all.serviceQuotasClients = append(all.serviceQuotasClients, servicequotas.NewFromConfig(cfg))
+		v.Credentials = aws.NewCredentialsCache(credentials)
+		all.serviceQuotasClients = append(all.serviceQuotasClients, servicequotas.NewFromConfig(v))
 	}
 
 	all.s3Client = s3.NewFromConfig(defaultConfig)
 
 	all.acmClients = make([]*acm.Client, 0)
-	for _, v := range regionList {
-		cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(v))
-		if err != nil {
-			log.Fatalf("failed to load SDK configuration, %v\n", err)
-		}
-		stsSvc := sts.NewFromConfig(cfg)
+	for _, v := range perRegionConfig {
+		stsSvc := sts.NewFromConfig(v)
 		credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
-		cfg.Credentials = aws.NewCredentialsCache(credentials)
-		all.acmClients = append(all.acmClients, acm.NewFromConfig(cfg))
+		v.Credentials = aws.NewCredentialsCache(credentials)
+		all.acmClients = append(all.acmClients, acm.NewFromConfig(v))
 	}
 
 	all.cloudFrontClient = cloudfront.NewFromConfig(defaultConfig)
