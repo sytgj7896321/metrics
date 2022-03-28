@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
@@ -113,17 +112,8 @@ func (all *allClients) lifeCycleEngine() {
 		log.Fatalf("failed to load SDK configuration, %v\n", err)
 	}
 
-	fmt.Println(defaultConfig.Credentials.Retrieve(context.TODO()))
-	fmt.Println(defaultConfig.Region)
-	fmt.Println(defaultConfig.RuntimeEnvironment)
-	fmt.Println(roleArn)
-
 	stsSvc := sts.NewFromConfig(defaultConfig)
-
 	credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
-
-	fmt.Println(credentials.Retrieve(context.TODO()))
-
 	defaultConfig.Credentials = aws.NewCredentialsCache(credentials)
 
 	all.serviceQuotasClients = make([]*servicequotas.Client, 0)
