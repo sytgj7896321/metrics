@@ -8,6 +8,8 @@ ENV GO111MODULE=on \
 
 WORKDIR /build
 
+RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates
+
 RUN git init && \
     git remote add -f origin https://github.com/sytgj7896321/metrics.git && \
     git config core.sparse-checkout true && \
@@ -18,8 +20,8 @@ RUN cd serviceQuotasExporter && go build .
 
 FROM scratch
 
-COPY --from=builder /build/serviceQuotasExporter /
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+COPY --from=builder /build/serviceQuotasExporter /
 
 ENTRYPOINT ["/serviceQuotasExporter"]
