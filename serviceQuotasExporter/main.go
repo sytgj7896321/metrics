@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
@@ -111,6 +112,8 @@ func (all *allClients) lifeCycleEngine() {
 	if err != nil {
 		log.Fatalf("failed to load SDK configuration, %v\n", err)
 	}
+
+	fmt.Println(defaultConfig.Credentials)
 
 	stsSvc := sts.NewFromConfig(defaultConfig)
 	credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
