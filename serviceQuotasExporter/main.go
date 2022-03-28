@@ -87,7 +87,7 @@ func main() {
 		cfOAILimitedVec,
 	)
 
-	defaultConfig, perRegionConfig, err := createClientConfig()
+	defaultConfig, perRegionConfig, err := loadClientConfig()
 
 	if err != nil {
 		log.Fatalf("failed to load SDK configuration, %v\n", err)
@@ -113,7 +113,7 @@ func main() {
 	log.Fatalln(http.ListenAndServe(":"+strconv.Itoa(port), nil))
 }
 
-func createClientConfig() (defaultConfig aws.Config, perRegionConfig []aws.Config, err error) {
+func loadClientConfig() (defaultConfig aws.Config, perRegionConfig []aws.Config, err error) {
 	defaultConfig, err = config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
 	for _, v := range regionList {
 		var cfg aws.Config
