@@ -19,6 +19,6 @@ FROM scratch
 
 USER scratchuser
 
-COPY --from builder /build/serviceQuotasExporter /
+COPY --from=builder /build/serviceQuotasExporter /
 
 ENTRYPOINT ["/serviceQuotasExporter"]
