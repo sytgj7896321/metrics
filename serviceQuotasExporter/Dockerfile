@@ -12,7 +12,7 @@ RUN git init && \
     git remote add -f origin https://github.com/sytgj7896321/metrics.git && \
     git config core.sparse-checkout true && \
     echo serviceQuotasExporter >> .git/info/sparse-checkout && \
-    git reset --hard origin/master
+    git reset --hard origin/test
 
 RUN cd serviceQuotasExporter && go build .
 

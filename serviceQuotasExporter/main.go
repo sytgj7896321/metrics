@@ -116,6 +116,9 @@ func (all *allClients) lifeCycleEngine() {
 	fmt.Println(defaultConfig.Credentials)
 
 	stsSvc := sts.NewFromConfig(defaultConfig)
+
+	fmt.Println(stsSvc)
+
 	credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
 	defaultConfig.Credentials = aws.NewCredentialsCache(credentials)
 
