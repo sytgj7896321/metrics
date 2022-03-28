@@ -1,4 +1,8 @@
-FROM golang:alpine as builder
+FROM golang:alpine as builder1
+
+RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates
+
+FROM golang:1.17 as builder2
 
 ENV GO111MODULE=on \
     CGO_ENABLED=0 \
@@ -7,8 +11,6 @@ ENV GO111MODULE=on \
     GOPROXY='https://proxy.golang.com.cn,direct'
 
 WORKDIR /build
-
-RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates
 
 RUN git init && \
     git remote add -f origin https://github.com/sytgj7896321/metrics.git && \
@@ -20,8 +22,8 @@ RUN cd serviceQuotasExporter && go build .
 
 FROM scratch
 
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder1 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY --from=builder /build/serviceQuotasExporter /
+COPY --from=builder2 /build/serviceQuotasExporter /
 
 ENTRYPOINT ["/serviceQuotasExporter"]
