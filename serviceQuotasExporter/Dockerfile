@@ -1,8 +1,4 @@
-FROM golang:alpine as builder1
-
-RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates
-
-FROM golang:1.17 as builder2
+FROM golang:1.17 as builder
 
 ENV GO111MODULE=on \
     CGO_ENABLED=0 \
@@ -12,20 +8,16 @@ ENV GO111MODULE=on \
 
 WORKDIR /build
 
-RUN git init && \
-    git remote add -f origin https://github.com/sytgj7896321/metrics.git && \
-    git config core.sparse-checkout true && \
-    echo serviceQuotasExporter >> .git/info/sparse-checkout && \
-    git reset --hard origin/test
+COPY ./ ./
 
-RUN cd serviceQuotasExporter && go build .
+RUN go build -o serviceQuotasExporter ./
 
 FROM scratch
 
 LABEL version="1.0.0" maintainer=sytgj7896321@gmail.com
 
-COPY --from=builder1 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY --from=builder2 /build/serviceQuotasExporter /
+COPY --from=builder /build/serviceQuotasExporter /
 
 ENTRYPOINT ["/serviceQuotasExporter"]
