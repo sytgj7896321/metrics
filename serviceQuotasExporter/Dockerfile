@@ -4,7 +4,7 @@ ENV GO111MODULE=on \
     CGO_ENABLED=0 \
     GOOS=linux \
     GOARCH=amd64 \
-    GOPROXY='https://goproxy.io,direct'
+    GOPROXY='https://proxy.golang.com.cn,direct'
 
 WORKDIR /build
 
