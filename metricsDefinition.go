@@ -82,14 +82,14 @@ var (
 			Name: "total_buckets_usage_per_region_current",
 			Help: "Total buckets usage per region current",
 		},
-		[]string{"region"},
+		[]string{"account", "region"},
 	)
 	s3LimitedVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "total_buckets_usage_per_region_limited",
 			Help: "Total buckets usage per region limited",
 		},
-		[]string{"region"},
+		[]string{"account", "region"},
 	)
 
 	acmInput      = acm.ListCertificatesInput{}
@@ -98,41 +98,45 @@ var (
 			Name: "total_certificates_usage_per_region_current",
 			Help: "Total certificates usage per region current",
 		},
-		[]string{"region"},
+		[]string{"account", "region"},
 	)
 	acmLimitedVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "total_certificates_usage_per_region_limited",
 			Help: "Total certificates usage per region limited",
 		},
-		[]string{"region"},
+		[]string{"account", "region"},
 	)
 
 	cfInput                   = cloudfront.ListDistributionsInput{}
-	cfDistributionsCurrentVec = prometheus.NewGauge(
+	cfDistributionsCurrentVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "total_cloudfront_distributions_usage_current",
 			Help: "Total cloudfront distributions usage current",
 		},
+		[]string{"account"},
 	)
-	cfDistributionsLimitedVec = prometheus.NewGauge(
+	cfDistributionsLimitedVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "total_cloudfront_distributions_usage_limited",
 			Help: "Total cloudfront distributions usage limited",
 		},
+		[]string{"account"},
 	)
 
 	cfOAIInput      = cloudfront.ListCloudFrontOriginAccessIdentitiesInput{}
-	cfOAICurrentVec = prometheus.NewGauge(
+	cfOAICurrentVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "total_cloudfront_origin_access_identifies_usage_current",
 			Help: "Total cloudfront origin access identifies usage current",
 		},
+		[]string{"account"},
 	)
-	cfOAILimitedVec = prometheus.NewGauge(
+	cfOAILimitedVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "total_cloudfront_origin_access_identifies_usage_limited",
 			Help: "Total cloudfront origin access identifies usage limited",
 		},
+		[]string{"account"},
 	)
 )
