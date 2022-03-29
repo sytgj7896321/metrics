@@ -89,7 +89,6 @@ func main() {
 	)
 
 	defaultConfig, perRegionConfig, err := loadClientConfig()
-
 	if err != nil {
 		log.Fatalf("failed to load SDK configuration, %v\n", err)
 	}
