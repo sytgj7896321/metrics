@@ -65,12 +65,13 @@ var (
 func init() {
 	flag.IntVar(&interval, "interval", 5, "time interval(minutes) of calling aws api to collect data")
 	flag.IntVar(&port, "port", 2112, "listen port")
-	flag.StringVar(&roleArn, "roleArn", "", "IAM roleArn of calling aws api")
 }
 
 func main() {
 	flag.Parse()
-	if roleArn == "" {
+	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" || os.Getenv("AWS_ROLE_ARN") == "" {
+		log.Fatalln("please set environment variables of 'AWS_ACCESS_KEY_ID' 'AWS_SECRET_ACCESS_KEY' 'AWS_ROLE_ARN'")
+	} else {
 		roleArn = os.Getenv("AWS_ROLE_ARN")
 	}
 
