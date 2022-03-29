@@ -88,25 +88,25 @@ func main() {
 	)
 
 	defaultConfig, perRegionConfig, err := loadClientConfig()
+
 	if err != nil {
 		log.Fatalf("failed to load SDK configuration, %v\n", err)
 	}
 
 	all := new(allClients)
-	updateToken, checkQuotas := time.Tick(59*time.Minute), time.Tick(5*time.Minute)
+
+	all.lifeCycleTokenUpdate(defaultConfig, perRegionConfig)
 
 	go func() {
-		all.lifeCycleTokenUpdate(defaultConfig, perRegionConfig)
-		trigger(all)
 		for {
 			select {
-			case <-updateToken:
+			case <-time.After(59 * time.Minute):
 				all.lifeCycleTokenUpdate(defaultConfig, perRegionConfig)
-			case <-checkQuotas:
-				trigger(all)
 			}
 		}
 	}()
+
+	trigger(all)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Println("Service Quotas Exporter Started")
@@ -150,10 +150,28 @@ func (all *allClients) lifeCycleTokenUpdate(defaultConfig aws.Config, perRegionC
 }
 
 func trigger(all *allClients) {
-	go all.checkBuckets()
-	go all.checkCertificates()
-	go all.checkCloudFrontDistributions()
-	go all.checkCloudFrontOAI()
+	for _, v := range []string{
+		"s3Buckets",
+		"acmCertificates",
+		"cloudfrontDistributions",
+		"cloudfrontOAI",
+	} {
+		go func(v string) {
+			for {
+				switch v {
+				case "s3Buckets":
+					all.checkBuckets()
+				case "acmCertificates":
+					all.checkCertificates()
+				case "cloudfrontDistributions":
+					all.checkCloudFrontDistributions()
+				case "cloudfrontOAI":
+					all.checkCloudFrontOAI()
+				}
+				time.Sleep(time.Duration(interval) * time.Minute)
+			}
+		}(v)
+	}
 }
 
 func findUsEast1Index(s []string) int {
