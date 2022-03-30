@@ -76,7 +76,6 @@ var (
 	}
 
 	s3Inout      = s3.ListBucketsInput{}
-	s3Result     = make(map[string]int)
 	s3CurrentVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "total_buckets_usage_per_region_current",

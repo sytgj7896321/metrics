@@ -2,27 +2,29 @@ package main
 
 import (
 	"context"
-	"flag"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/viper"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"sync"
 	"time"
 )
 
 type allClients struct {
+	account              string
+	key                  string
+	secret               string
+	defaultConfig        aws.Config
+	perRegionConfig      []aws.Config
 	s3Client             *s3.Client
 	acmClients           []*acm.Client
 	cloudFrontClient     *cloudfront.Client
@@ -59,21 +61,24 @@ var (
 	usEast1  = findUsEast1Index(regionList)
 	interval int
 	port     int
-	roleArn  string
+	account  []string
+	key      []string
+	secret   []string
 )
 
-func init() {
-	flag.IntVar(&interval, "interval", 5, "time interval(minutes) of calling aws api to collect data")
-	flag.IntVar(&port, "port", 2112, "listen port")
-}
-
 func main() {
-	flag.Parse()
-	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" || os.Getenv("AWS_ROLE_ARN") == "" {
-		log.Fatalln("please set environment variables of 'AWS_ACCESS_KEY_ID' 'AWS_SECRET_ACCESS_KEY' 'AWS_ROLE_ARN'")
-	} else {
-		roleArn = os.Getenv("AWS_ROLE_ARN")
+	viper.AddConfigPath("./")
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Fatalln(err)
 	}
+	viper.SetDefault("service.interval", 5)
+	viper.SetDefault("service.port", 2112)
+	interval = viper.GetInt("service.interval")
+	port = viper.GetInt("service.port")
+	account = viper.GetStringSlice("info.account")
+	key = viper.GetStringSlice("info.key")
+	secret = viper.GetStringSlice("info.secret")
 
 	prometheus.MustRegister(
 		failCount,
@@ -88,90 +93,70 @@ func main() {
 		cfOAILimitedVec,
 	)
 
-	defaultConfig, perRegionConfig, err := loadClientConfig()
-	if err != nil {
-		log.Fatalf("failed to load SDK configuration, %v\n", err)
+	for i := range account {
+		go multiAccountControlEngine(i)
 	}
-
-	all := new(allClients)
-
-	all.lifeCycleTokenUpdate(defaultConfig, perRegionConfig)
-
-	go func() {
-		for {
-			select {
-			case <-time.After(59 * time.Minute):
-				all.lifeCycleTokenUpdate(defaultConfig, perRegionConfig)
-			}
-		}
-	}()
-
-	trigger(all)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Println("Service Quotas Exporter Started")
 	log.Fatalln(http.ListenAndServe(":"+strconv.Itoa(port), nil))
 }
 
-func loadClientConfig() (defaultConfig aws.Config, perRegionConfig []aws.Config, err error) {
-	defaultConfig, err = config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-west-2"))
-	for _, v := range regionList {
-		var cfg aws.Config
-		cfg, err = config.LoadDefaultConfig(context.TODO(), config.WithRegion(v))
-		perRegionConfig = append(perRegionConfig, cfg)
-	}
-	return defaultConfig, perRegionConfig, err
+func multiAccountControlEngine(i int) {
+	all := new(allClients)
+	all.account = account[i]
+	all.key = key[i]
+	all.secret = secret[i]
+	all.loadClientConfig()
+	all.createClients()
+
+	go func() {
+		go trigger(all)
+		for {
+			select {
+			case <-time.Tick(time.Duration(interval) * time.Minute):
+				go trigger(all)
+			}
+		}
+	}()
 }
 
-func (all *allClients) lifeCycleTokenUpdate(defaultConfig aws.Config, perRegionConfig []aws.Config) {
-	stsSvc := sts.NewFromConfig(defaultConfig)
-	credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
-	defaultConfig.Credentials = aws.NewCredentialsCache(credentials)
+func (all *allClients) loadClientConfig() {
+	all.defaultConfig = aws.Config{
+		Region:      "us-west-2",
+		Credentials: credentials.NewStaticCredentialsProvider(all.key, all.secret, ""),
+	}
 
+	for _, v := range regionList {
+		cfg := aws.Config{
+			Region:      v,
+			Credentials: credentials.NewStaticCredentialsProvider(all.key, all.secret, ""),
+		}
+		all.perRegionConfig = append(all.perRegionConfig, cfg)
+	}
+}
+
+func (all *allClients) createClients() {
 	all.serviceQuotasClients = make([]*servicequotas.Client, 0)
-	for _, v := range perRegionConfig {
-		stsSvc := sts.NewFromConfig(v)
-		credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
-		v.Credentials = aws.NewCredentialsCache(credentials)
+	for _, v := range all.perRegionConfig {
 		all.serviceQuotasClients = append(all.serviceQuotasClients, servicequotas.NewFromConfig(v))
 	}
 
-	all.s3Client = s3.NewFromConfig(defaultConfig)
+	all.s3Client = s3.NewFromConfig(all.defaultConfig)
 
 	all.acmClients = make([]*acm.Client, 0)
-	for _, v := range perRegionConfig {
-		stsSvc := sts.NewFromConfig(v)
-		credentials := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
-		v.Credentials = aws.NewCredentialsCache(credentials)
+	for _, v := range all.perRegionConfig {
 		all.acmClients = append(all.acmClients, acm.NewFromConfig(v))
 	}
 
-	all.cloudFrontClient = cloudfront.NewFromConfig(defaultConfig)
+	all.cloudFrontClient = cloudfront.NewFromConfig(all.defaultConfig)
 }
 
 func trigger(all *allClients) {
-	for _, v := range []string{
-		"s3Buckets",
-		"acmCertificates",
-		"cloudfrontDistributions",
-		"cloudfrontOAI",
-	} {
-		go func(v string) {
-			for {
-				switch v {
-				case "s3Buckets":
-					all.checkBuckets()
-				case "acmCertificates":
-					all.checkCertificates()
-				case "cloudfrontDistributions":
-					all.checkCloudFrontDistributions()
-				case "cloudfrontOAI":
-					all.checkCloudFrontOAI()
-				}
-				time.Sleep(time.Duration(interval) * time.Minute)
-			}
-		}(v)
-	}
+	go all.checkBuckets()
+	go all.checkCertificates()
+	go all.checkCloudFrontDistributions()
+	go all.checkCloudFrontOAI()
 }
 
 func findUsEast1Index(s []string) int {
@@ -186,14 +171,11 @@ func findUsEast1Index(s []string) int {
 func (all *allClients) checkBuckets() {
 	var wg sync.WaitGroup
 	var mux sync.Mutex
+	s3Result := make(map[string]int)
 	buckets, err := all.s3Client.ListBuckets(context.TODO(), &s3Inout)
 	totalCount.WithLabelValues("listBuckets").Inc()
 	if errorHandle(err, "listBuckets") {
 		return
-	}
-
-	for _, v := range regionList {
-		s3Result[v] = 0
 	}
 
 	wg.Add(len(buckets.Buckets))
@@ -227,16 +209,16 @@ func (all *allClients) checkBuckets() {
 			continue
 		}
 		if len(quota.RequestedQuotas) != 0 {
-			s3CurrentVec.WithLabelValues(v).Set(float64(s3Result[v]))
-			s3LimitedVec.WithLabelValues(v).Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
+			s3CurrentVec.WithLabelValues(all.account, v).Set(float64(s3Result[v]))
+			s3LimitedVec.WithLabelValues(all.account, v).Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
 		} else {
 			quotaDefault, err := all.serviceQuotasClients[i].GetAWSDefaultServiceQuota(context.TODO(), &serviceQuotasS3FilterDefault)
 			totalCount.WithLabelValues("getQuotasDefault").Inc()
 			if errorHandle(err, "getQuotasDefault") {
 				continue
 			}
-			s3CurrentVec.WithLabelValues(v).Set(float64(s3Result[v]))
-			s3LimitedVec.WithLabelValues(v).Set(*quotaDefault.Quota.Value)
+			s3CurrentVec.WithLabelValues(all.account, v).Set(float64(s3Result[v]))
+			s3LimitedVec.WithLabelValues(all.account, v).Set(*quotaDefault.Quota.Value)
 		}
 	}
 }
@@ -250,8 +232,8 @@ func (all *allClients) checkCertificates() {
 		}
 
 		if regionList[i] == "eu-north-1" {
-			acmCurrentVec.WithLabelValues(regionList[i]).Set(float64(len(certificates.CertificateSummaryList)))
-			acmLimitedVec.WithLabelValues(regionList[i]).Set(float64(2500))
+			acmCurrentVec.WithLabelValues(all.account, regionList[i]).Set(float64(len(certificates.CertificateSummaryList)))
+			acmLimitedVec.WithLabelValues(all.account, regionList[i]).Set(float64(2500))
 			continue
 		}
 
@@ -261,16 +243,16 @@ func (all *allClients) checkCertificates() {
 			continue
 		}
 		if len(quota.RequestedQuotas) != 0 {
-			acmCurrentVec.WithLabelValues(regionList[i]).Set(float64(len(certificates.CertificateSummaryList)))
-			acmLimitedVec.WithLabelValues(regionList[i]).Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
+			acmCurrentVec.WithLabelValues(all.account, regionList[i]).Set(float64(len(certificates.CertificateSummaryList)))
+			acmLimitedVec.WithLabelValues(all.account, regionList[i]).Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
 		} else {
 			quotaDefault, err := all.serviceQuotasClients[i].GetAWSDefaultServiceQuota(context.TODO(), &serviceQuotasACMFilterDefault)
 			totalCount.WithLabelValues("getQuotasDefault").Inc()
 			if errorHandle(err, "getQuotasDefault") {
 				continue
 			}
-			acmCurrentVec.WithLabelValues(regionList[i]).Set(float64(len(certificates.CertificateSummaryList)))
-			acmLimitedVec.WithLabelValues(regionList[i]).Set(*quotaDefault.Quota.Value)
+			acmCurrentVec.WithLabelValues(all.account, regionList[i]).Set(float64(len(certificates.CertificateSummaryList)))
+			acmLimitedVec.WithLabelValues(all.account, regionList[i]).Set(*quotaDefault.Quota.Value)
 		}
 	}
 }
@@ -287,16 +269,16 @@ func (all *allClients) checkCloudFrontDistributions() {
 		return
 	}
 	if len(quota.RequestedQuotas) != 0 {
-		cfDistributionsCurrentVec.Set(float64(len(distributions.DistributionList.Items)))
-		cfDistributionsLimitedVec.Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
+		cfDistributionsCurrentVec.WithLabelValues(all.account).Set(float64(len(distributions.DistributionList.Items)))
+		cfDistributionsLimitedVec.WithLabelValues(all.account).Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
 	} else {
 		quotaDefault, err := all.serviceQuotasClients[usEast1].GetAWSDefaultServiceQuota(context.TODO(), &serviceQuotasCloudFrontDistributionsFilterDefault)
 		totalCount.WithLabelValues("getQuotasDefault").Inc()
 		if errorHandle(err, "getQuotasDefault") {
 			return
 		}
-		cfDistributionsCurrentVec.Set(float64(len(distributions.DistributionList.Items)))
-		cfDistributionsLimitedVec.Set(*quotaDefault.Quota.Value)
+		cfDistributionsCurrentVec.WithLabelValues(all.account).Set(float64(len(distributions.DistributionList.Items)))
+		cfDistributionsLimitedVec.WithLabelValues(all.account).Set(*quotaDefault.Quota.Value)
 	}
 }
 
@@ -312,16 +294,16 @@ func (all *allClients) checkCloudFrontOAI() {
 		return
 	}
 	if len(quota.RequestedQuotas) != 0 {
-		cfOAICurrentVec.Set(float64(len(identities.CloudFrontOriginAccessIdentityList.Items)))
-		cfOAILimitedVec.Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
+		cfOAICurrentVec.WithLabelValues(all.account).Set(float64(len(identities.CloudFrontOriginAccessIdentityList.Items)))
+		cfOAILimitedVec.WithLabelValues(all.account).Set(*quota.RequestedQuotas[len(quota.RequestedQuotas)-1].DesiredValue)
 	} else {
 		quotaDefault, err := all.serviceQuotasClients[usEast1].GetAWSDefaultServiceQuota(context.TODO(), &serviceQuotasCloudFrontOAIFilterDefault)
 		totalCount.WithLabelValues("getQuotasDefault").Inc()
 		if errorHandle(err, "getQuotasDefault") {
 			return
 		}
-		cfOAICurrentVec.Set(float64(len(identities.CloudFrontOriginAccessIdentityList.Items)))
-		cfOAILimitedVec.Set(*quotaDefault.Quota.Value)
+		cfOAICurrentVec.WithLabelValues(all.account).Set(float64(len(identities.CloudFrontOriginAccessIdentityList.Items)))
+		cfOAILimitedVec.WithLabelValues(all.account).Set(*quotaDefault.Quota.Value)
 	}
 }
 
