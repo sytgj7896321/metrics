@@ -14,7 +14,7 @@ RUN go build -o serviceQuotasExporter ./
 
 FROM scratch
 
-LABEL version="1.0.0" maintainer=sytgj7896321@gmail.com
+LABEL version="1.1.1" maintainer=sytgj7896321@gmail.com
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
